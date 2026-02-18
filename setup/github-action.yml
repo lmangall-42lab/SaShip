@@ -1,0 +1,438 @@
+# SaShip Daily Digest — GitHub Action
+# Install this on the CLIENT DEV REPO (not the tracking repo).
+#
+# Required secrets (set on the client dev repo):
+#   AI_GATEWAY_API_KEY   — Vercel AI Gateway API key for commit summarization
+#   SLACK_WEBHOOK_URL    — Slack incoming webhook for daily digest
+#   TRACKING_REPO_TOKEN  — GitHub PAT with repo write access to the tracking repo
+#
+# Required variables:
+#   TRACKING_REPO        — e.g. "org/saship-tracking"
+#   TRACKING_BRANCH      — e.g. "project-x"
+#   COMMIT_PREFIX        — e.g. "[project-x]"
+
+name: SaShip Daily Digest
+
+on:
+  schedule:
+    - cron: "0 18 * * 1-5" # Weekdays at 6 PM UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout client repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Collect today's commits
+        id: commits
+        run: |
+          SINCE=$(date -u -d "24 hours ago" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v-24H +%Y-%m-%dT%H:%M:%SZ)
+          PREFIX="${{ vars.COMMIT_PREFIX }}"
+          echo "::group::Commit collection"
+          echo "Looking for commits since $SINCE with prefix '$PREFIX'"
+
+          # Get commits from all branches, filtered by prefix
+          COMMITS=$(git log --all --since="$SINCE" --pretty=format:'%H|%an|%s' | grep "$PREFIX" || true)
+
+          if [ -z "$COMMITS" ]; then
+            echo "no_commits=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::No commits with prefix $PREFIX found in the last 24h"
+            echo "::endgroup::"
+            exit 0
+          fi
+
+          COMMIT_COUNT=$(echo "$COMMITS" | wc -l | tr -d ' ')
+          echo "Found $COMMIT_COUNT commit(s)"
+          echo "$COMMITS"
+          echo "no_commits=false" >> "$GITHUB_OUTPUT"
+
+          # Build JSON array of commits using jq for safe encoding
+          echo "$COMMITS" | while IFS= read -r line; do
+            HASH=$(echo "$line" | cut -d'|' -f1)
+            AUTHOR=$(echo "$line" | cut -d'|' -f2)
+            MESSAGE=$(echo "$line" | cut -d'|' -f3-)
+            # Determine environment by checking which branches contain this commit
+            ENV="dev"
+            if git branch -a --contains "$HASH" 2>/dev/null | grep -qE "main$|master$|production$|remotes/origin/main$|remotes/origin/master$|remotes/origin/production$"; then
+              ENV="prod"
+            fi
+            # Determine status from branch: main/production = deployed, staging = in-dev
+            STATUS="in-dev"
+            if [ "$ENV" = "prod" ]; then
+              STATUS="deployed"
+            fi
+            jq -n --arg h "$HASH" --arg a "$AUTHOR" --arg m "$MESSAGE" --arg e "$ENV" --arg s "$STATUS" \
+              '{hash:$h, author:$a, message:$m, env:$e, status:$s}'
+          done | jq -s '.' > /tmp/commits.json
+
+          echo "commits_json<<EOF" >> "$GITHUB_OUTPUT"
+          cat /tmp/commits.json >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          echo "Commits JSON:"
+          cat /tmp/commits.json
+          echo "::endgroup::"
+
+      - name: Fetch roadmap context from tracking repo
+        if: steps.commits.outputs.no_commits != 'true'
+        id: roadmap
+        env:
+          TRACKING_REPO_TOKEN: ${{ secrets.TRACKING_REPO_TOKEN }}
+          TRACKING_REPO: ${{ vars.TRACKING_REPO }}
+          TRACKING_BRANCH: ${{ vars.TRACKING_BRANCH }}
+        run: |
+          echo "::group::Fetch roadmap context"
+
+          # Fetch project.config.json
+          CONFIG_RESP=$(curl -s \
+            -H "Authorization: token $TRACKING_REPO_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/$TRACKING_REPO/contents/project.config.json?ref=$TRACKING_BRANCH")
+
+          PROJECT_CONFIG=$(echo "$CONFIG_RESP" | jq -r '.content // empty' | base64 -d 2>/dev/null || echo '{}')
+          echo "Project config fetched: $(echo "$PROJECT_CONFIG" | jq -r '.project // "unknown"')"
+
+          # Fetch list of content/*.mdx files
+          CONTENT_RESP=$(curl -s \
+            -H "Authorization: token $TRACKING_REPO_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/$TRACKING_REPO/contents/content?ref=$TRACKING_BRANCH")
+
+          # For each MDX file, fetch its frontmatter
+          ROADMAP_ENTRIES="[]"
+          for FILE_URL in $(echo "$CONTENT_RESP" | jq -r '.[]? | select(.name | endswith(".mdx")) | .url'); do
+            FILE_DATA=$(curl -s \
+              -H "Authorization: token $TRACKING_REPO_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "$FILE_URL?ref=$TRACKING_BRANCH")
+
+            FILENAME=$(echo "$FILE_DATA" | jq -r '.name')
+            SLUG="${FILENAME%.mdx}"
+            FILE_CONTENT=$(echo "$FILE_DATA" | jq -r '.content // empty' | base64 -d 2>/dev/null || true)
+
+            if [ -n "$FILE_CONTENT" ]; then
+              # Extract frontmatter fields
+              TITLE=$(echo "$FILE_CONTENT" | sed -n '/^---$/,/^---$/p' | grep '^title:' | sed 's/^title: *//')
+              OWNER=$(echo "$FILE_CONTENT" | sed -n '/^---$/,/^---$/p' | grep '^owner:' | sed 's/^owner: *//')
+              STATUS=$(echo "$FILE_CONTENT" | sed -n '/^---$/,/^---$/p' | grep '^status:' | sed 's/^status: *//')
+              ENV=$(echo "$FILE_CONTENT" | sed -n '/^---$/,/^---$/p' | grep '^environment:' | sed 's/^environment: *//')
+
+              ROADMAP_ENTRIES=$(echo "$ROADMAP_ENTRIES" | jq --arg s "$SLUG" --arg t "$TITLE" --arg o "$OWNER" --arg st "$STATUS" --arg e "$ENV" \
+                '. + [{slug: $s, title: $t, owner: $o, status: $st, environment: $e}]')
+            fi
+          done
+
+          echo "Found $(echo "$ROADMAP_ENTRIES" | jq 'length') existing roadmap entries"
+          echo "$ROADMAP_ENTRIES" | jq '.'
+
+          # Write to temp files for the next step (avoids shell quoting issues)
+          echo "$PROJECT_CONFIG" > /tmp/project_config.json
+          echo "$ROADMAP_ENTRIES" > /tmp/roadmap_entries.json
+
+          echo "project_config<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$PROJECT_CONFIG" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+          echo "roadmap_entries<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$ROADMAP_ENTRIES" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+          echo "::endgroup::"
+
+      - name: Summarize with AI Gateway
+        if: steps.commits.outputs.no_commits != 'true'
+        id: summary
+        env:
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+        run: |
+          TODAY=$(date +%Y-%m-%d)
+
+          # Write commits, config, and roadmap to temp files (already there from previous steps)
+          echo '${{ steps.commits.outputs.commits_json }}' > /tmp/commits_input.json
+          echo '${{ steps.roadmap.outputs.project_config }}' > /tmp/config_input.json
+          echo '${{ steps.roadmap.outputs.roadmap_entries }}' > /tmp/roadmap_input.json
+
+          COMMITS=$(cat /tmp/commits_input.json)
+          CONFIG=$(cat /tmp/config_input.json)
+          ROADMAP=$(cat /tmp/roadmap_input.json)
+
+          # Build the prompt as a file to avoid shell quoting issues
+          cat > /tmp/ai_prompt.txt <<PROMPT_EOF
+          You are a shipping visibility assistant for a SaaS project. You have full context of the project roadmap.
+
+          PROJECT CONFIGURATION:
+          $CONFIG
+
+          EXISTING ROADMAP DELIVERABLES (current state):
+          $ROADMAP
+
+          TODAY'S COMMITS:
+          $COMMITS
+
+          INSTRUCTIONS:
+          1. Match each commit to an EXISTING deliverable from the roadmap using the exact slug from the roadmap entries above.
+          2. If a commit clearly relates to a deliverable listed in the project config that has NO MDX file yet, create a new entry using the naming convention: kebab-case-title-ownerfirstname (e.g. "finances-ai-onboarding-wizard-leonard").
+          3. If a commit does NOT clearly map to any deliverable, SKIP it — do not force a match. Include it only in the Slack digest under a "Other changes" section.
+          4. DO NOT determine status yourself. Each commit already has a "status" field derived from its branch (staging = "in-dev", main/production = "deployed"). Use that value as-is.
+          5. Write a plain-English changelog entry for each matched deliverable. Format:
+             ### $TODAY
+             <concise plain-English summary> — *<Author>*
+          6. Write a Slack-formatted daily digest grouped by developer, then by environment (dev/prod). Use plain English, not raw commit messages.
+
+          Respond in JSON format:
+          {
+            "slack_message": "<slack markdown formatted digest>",
+            "mdx_updates": [
+              {
+                "deliverable_slug": "<exact slug from roadmap or new kebab-case slug>",
+                "title": "<deliverable title — only needed for new files>",
+                "owner": "<author>",
+                "environment": "<dev|prod from the commit>",
+                "status": "<in-dev|deployed from the commit>",
+                "entry": "### $TODAY\n<summary> — *Author*"
+              }
+            ]
+          }
+
+          If no commits match any deliverable, return an empty mdx_updates array.
+          PROMPT_EOF
+
+          echo "::group::AI Gateway request"
+          echo "Calling AI Gateway (model: anthropic/claude-haiku-4-5)"
+
+          # Use jq to safely encode the prompt into JSON
+          PROMPT_CONTENT=$(cat /tmp/ai_prompt.txt)
+          jq -n --arg content "$PROMPT_CONTENT" '{
+            model: "anthropic/claude-haiku-4-5",
+            max_tokens: 2048,
+            messages: [{role: "user", content: $content}]
+          }' > /tmp/ai_request.json
+
+          HTTP_CODE=$(curl -s -o /tmp/ai_response.json -w "%{http_code}" \
+            https://ai-gateway.vercel.sh/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $AI_GATEWAY_API_KEY" \
+            -d @/tmp/ai_request.json)
+
+          RESPONSE=$(cat /tmp/ai_response.json)
+          echo "AI Gateway HTTP status: $HTTP_CODE"
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::AI Gateway returned HTTP $HTTP_CODE"
+            echo "Response body: $RESPONSE"
+            echo "::endgroup::"
+            exit 1
+          fi
+
+          # Extract the text content (OpenAI-compatible response format)
+          CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
+
+          if [ -z "$CONTENT" ] || [ "$CONTENT" = "null" ]; then
+            echo "::error::AI Gateway returned empty content"
+            echo "Raw response: $RESPONSE"
+            echo "::endgroup::"
+            exit 1
+          fi
+
+          echo "AI Gateway response received (${#CONTENT} chars)"
+          echo "::endgroup::"
+
+          echo "response<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$CONTENT" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Post to Slack
+        if: steps.commits.outputs.no_commits != 'true'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          RESPONSE='${{ steps.summary.outputs.response }}'
+          SLACK_MSG=$(echo "$RESPONSE" | jq -r '.slack_message // empty')
+
+          if [ -z "$SLACK_MSG" ]; then
+            echo "::warning::No slack_message found in AI response — skipping Slack post"
+            exit 0
+          fi
+
+          echo "::group::Slack post"
+          SLACK_HTTP=$(curl -s -o /tmp/slack_response.txt -w "%{http_code}" \
+            -X POST "$SLACK_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"text\": $(echo "$SLACK_MSG" | jq -Rs .)}")
+
+          echo "Slack HTTP status: $SLACK_HTTP"
+          if [ "$SLACK_HTTP" != "200" ]; then
+            echo "::error::Slack webhook returned HTTP $SLACK_HTTP"
+            cat /tmp/slack_response.txt
+          else
+            echo "Slack digest posted successfully"
+          fi
+          echo "::endgroup::"
+
+      - name: Update tracking repo MDX files
+        if: steps.commits.outputs.no_commits != 'true'
+        env:
+          TRACKING_REPO_TOKEN: ${{ secrets.TRACKING_REPO_TOKEN }}
+          TRACKING_REPO: ${{ vars.TRACKING_REPO }}
+          TRACKING_BRANCH: ${{ vars.TRACKING_BRANCH }}
+        run: |
+          RESPONSE='${{ steps.summary.outputs.response }}'
+
+          UPDATE_COUNT=$(echo "$RESPONSE" | jq '.mdx_updates | length')
+          echo "::group::MDX updates ($UPDATE_COUNT file(s))"
+
+          if [ "$UPDATE_COUNT" = "0" ]; then
+            echo "No deliverable updates — all commits were unmatched"
+            echo "::endgroup::"
+            exit 0
+          fi
+
+          echo "$RESPONSE" | jq -c '.mdx_updates[]' | while read -r update; do
+            SLUG=$(echo "$update" | jq -r '.deliverable_slug')
+            ENTRY=$(echo "$update" | jq -r '.entry')
+            OWNER=$(echo "$update" | jq -r '.owner')
+            ENV=$(echo "$update" | jq -r '.environment')
+            STATUS=$(echo "$update" | jq -r '.status')
+            TITLE=$(echo "$update" | jq -r '.title // empty')
+            FILE_PATH="content/${SLUG}.mdx"
+
+            echo "--- Updating $FILE_PATH on $TRACKING_REPO@$TRACKING_BRANCH (status=$STATUS, env=$ENV, owner=$OWNER)"
+
+            # Get current file content (if exists)
+            EXISTING=$(curl -s \
+              -H "Authorization: token $TRACKING_REPO_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/$TRACKING_REPO/contents/$FILE_PATH?ref=$TRACKING_BRANCH")
+
+            SHA=$(echo "$EXISTING" | jq -r '.sha // empty')
+            CURRENT_CONTENT=$(echo "$EXISTING" | jq -r '.content // empty' | base64 -d 2>/dev/null || true)
+
+            if [ -n "$CURRENT_CONTENT" ]; then
+              # Prepend new entry after "## Changelog" line
+              NEW_CONTENT=$(echo "$CURRENT_CONTENT" | sed "/^## Changelog$/a\\
+\\
+$ENTRY")
+              # Update frontmatter status and environment
+              NEW_CONTENT=$(echo "$NEW_CONTENT" | sed "s/^status: .*/status: $STATUS/")
+              NEW_CONTENT=$(echo "$NEW_CONTENT" | sed "s/^environment: .*/environment: $ENV/")
+            else
+              # Create new file — use title from AI response or derive from slug
+              if [ -z "$TITLE" ]; then
+                TITLE=$(echo "$SLUG" | sed 's/-/ /g' | awk '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) tolower(substr($i,2))}1')
+              fi
+              NEW_CONTENT="---
+title: $TITLE
+owner: $OWNER
+status: $STATUS
+environment: $ENV
+---
+
+## Changelog
+
+$ENTRY"
+            fi
+
+            # Validate MDX (basic check — ensure frontmatter is intact)
+            if ! echo "$NEW_CONTENT" | head -1 | grep -q "^---$"; then
+              echo "ERROR: Invalid MDX for $SLUG — skipping"
+              continue
+            fi
+
+            # Commit to tracking repo
+            ENCODED=$(echo "$NEW_CONTENT" | base64 | tr -d '\n')
+
+            PAYLOAD=$(jq -n --arg msg "update: $SLUG digest $(date +%Y-%m-%d)" \
+              --arg content "$ENCODED" \
+              --arg branch "$TRACKING_BRANCH" \
+              --arg sha "$SHA" \
+              'if $sha == "" then {message:$msg, content:$content, branch:$branch}
+               else {message:$msg, content:$content, branch:$branch, sha:$sha} end')
+
+            MDX_HTTP=$(curl -s -o /tmp/mdx_response.json -w "%{http_code}" -X PUT \
+              -H "Authorization: token $TRACKING_REPO_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/$TRACKING_REPO/contents/$FILE_PATH" \
+              -d "$PAYLOAD")
+
+            if [ "$MDX_HTTP" = "200" ] || [ "$MDX_HTTP" = "201" ]; then
+              echo "Updated $FILE_PATH (HTTP $MDX_HTTP)"
+            else
+              echo "::error::Failed to update $FILE_PATH (HTTP $MDX_HTTP)"
+              cat /tmp/mdx_response.json
+            fi
+          done
+          echo "::endgroup::"
+
+      - name: Update stats.json with lines per dev
+        if: steps.commits.outputs.no_commits != 'true'
+        env:
+          TRACKING_REPO_TOKEN: ${{ secrets.TRACKING_REPO_TOKEN }}
+          TRACKING_REPO: ${{ vars.TRACKING_REPO }}
+          TRACKING_BRANCH: ${{ vars.TRACKING_BRANCH }}
+        run: |
+          echo '${{ steps.commits.outputs.commits_json }}' > /tmp/commits_stats.json
+          COMMITS=$(cat /tmp/commits_stats.json)
+          echo "::group::Stats update"
+
+          # Count lines added per author from today's commits
+          LINES_TODAY=$(echo "$COMMITS" | jq -r '.[] | .author + "|" + .hash' | while read -r entry; do
+            AUTHOR=$(echo "$entry" | cut -d'|' -f1)
+            HASH=$(echo "$entry" | cut -d'|' -f2)
+            ADDED=$(git show --stat "$HASH" 2>/dev/null | tail -1 | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo 0)
+            echo "$AUTHOR|$ADDED"
+          done | awk -F'|' '{a[$1]+=$2} END {for(k in a) printf "%s|%d\n",k,a[k]}')
+
+          # Get current stats.json
+          EXISTING=$(curl -s \
+            -H "Authorization: token $TRACKING_REPO_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/$TRACKING_REPO/contents/stats.json?ref=$TRACKING_BRANCH")
+
+          SHA=$(echo "$EXISTING" | jq -r '.sha // empty')
+          CURRENT=$(echo "$EXISTING" | jq -r '.content // empty' | base64 -d 2>/dev/null || echo '{"daily":[],"lastUpdated":""}')
+
+          # Build today's daily entry: {"date":"2026-02-18","Quentin":150,"Leonard":200}
+          TODAY=$(date +%Y-%m-%d)
+          echo '{}' | jq --arg d "$TODAY" '{date: $d}' > /tmp/today_entry.json
+
+          while IFS='|' read -r dev lines; do
+            [ -z "$dev" ] && continue
+            jq --arg d "$dev" --argjson l "$lines" '.[$d] = $l' /tmp/today_entry.json > /tmp/today_tmp.json \
+              && mv /tmp/today_tmp.json /tmp/today_entry.json
+          done <<< "$LINES_TODAY"
+
+          # Append today's entry to daily array (replace if same date exists) and update lastUpdated
+          ENTRY=$(cat /tmp/today_entry.json)
+          echo "$CURRENT" | jq --argjson entry "$ENTRY" --arg date "$TODAY" \
+            '(.daily | map(select(.date != $date))) + [$entry] | {daily: ., lastUpdated: $date}' \
+            > /tmp/stats_updated.json
+
+          # Push updated stats.json
+          ENCODED=$(jq -c '.' /tmp/stats_updated.json | base64 | tr -d '\n')
+
+          PAYLOAD=$(jq -n --arg msg "stats: update $(date +%Y-%m-%d)" \
+            --arg content "$ENCODED" \
+            --arg branch "$TRACKING_BRANCH" \
+            --arg sha "$SHA" \
+            'if $sha == "" then {message:$msg, content:$content, branch:$branch}
+             else {message:$msg, content:$content, branch:$branch, sha:$sha} end')
+
+          STATS_HTTP=$(curl -s -o /tmp/stats_response.json -w "%{http_code}" -X PUT \
+            -H "Authorization: token $TRACKING_REPO_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/$TRACKING_REPO/contents/stats.json" \
+            -d "$PAYLOAD")
+
+          if [ "$STATS_HTTP" = "200" ] || [ "$STATS_HTTP" = "201" ]; then
+            echo "Updated stats.json (HTTP $STATS_HTTP)"
+          else
+            echo "::error::Failed to update stats.json (HTTP $STATS_HTTP)"
+            cat /tmp/stats_response.json
+          fi
+          echo "::endgroup::"
