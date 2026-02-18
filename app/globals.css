@@ -1,0 +1,166 @@
+@import "tailwindcss";
+
+:root {
+  /* Backgrounds */
+  --bg-base: #e8e4dc;
+  --bg-surface: #edeae2;
+  --bg-dark: #1c1c14;
+  --bg-panel: #f0ede5;
+  --bg-panel-border: #c8c4bc;
+
+  /* Brand / Accent */
+  --accent-primary: #d0f501;
+  --accent-primary-dim: #a8cc00;
+  --accent-text: #4a6800;
+  --accent-glow: rgba(208, 245, 1, 0.2);
+
+  /* Neutrals */
+  --neutral-100: #f5f2ea;
+  --neutral-200: #e8e4dc;
+  --neutral-300: #d0ccc4;
+  --neutral-400: #78746c;
+  --neutral-600: #5a5a50;
+  --neutral-900: #1a1a14;
+
+  /* Text */
+  --text-primary: #1a1a14;
+  --text-secondary: #3a3a30;
+  --text-muted: #4a4a40;
+  --text-on-dark: #d4d0c4;
+  --text-label: #3a3a30;
+
+  /* Status */
+  --status-live: #d0f501;
+  --status-dev: #d0f501;
+  --status-prod: #4a9eff;
+  --status-error: #c84040;
+  --status-done: #5ab870;
+
+  /* Borders */
+  --border-default: #c0bdb5;
+  --border-dark: #3a3a30;
+  --border-accent: #d0f501;
+}
+
+@theme inline {
+  --color-bg-base: var(--bg-base);
+  --color-bg-surface: var(--bg-surface);
+  --color-bg-dark: var(--bg-dark);
+  --color-bg-panel: var(--bg-panel);
+  --color-accent: var(--accent-primary);
+  --color-accent-dim: var(--accent-primary-dim);
+  --color-accent-text: var(--accent-text);
+  --color-accent-glow: var(--accent-glow);
+  --color-neutral-100: var(--neutral-100);
+  --color-neutral-200: var(--neutral-200);
+  --color-neutral-300: var(--neutral-300);
+  --color-neutral-400: var(--neutral-400);
+  --color-neutral-600: var(--neutral-600);
+  --color-neutral-900: var(--neutral-900);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-text-on-dark: var(--text-on-dark);
+  --color-text-label: var(--text-label);
+  --color-status-live: var(--status-live);
+  --color-status-dev: var(--status-dev);
+  --color-status-prod: var(--status-prod);
+  --color-status-error: var(--status-error);
+  --color-status-done: var(--status-done);
+  --color-border-default: var(--border-default);
+  --color-border-dark: var(--border-dark);
+  --color-border-accent: var(--border-accent);
+  --font-mono: "IBM Plex Mono", "JetBrains Mono", "Courier New", monospace;
+  --font-display: "IBM Plex Mono", "JetBrains Mono", "Courier New", monospace;
+}
+
+/* Dotted background pattern */
+body {
+  background-color: var(--bg-base);
+  background-image: radial-gradient(circle, #b8b4ac 1px, transparent 1px);
+  background-size: 20px 20px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+/* Label treatment */
+.label {
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text-label);
+  font-family: var(--font-mono);
+}
+
+/* Section coordinates */
+.section-label {
+  position: absolute;
+  bottom: 16px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--neutral-400);
+  font-family: var(--font-mono);
+}
+
+.section-label::before {
+  content: "// ";
+}
+
+/* Animations */
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.animate-enter {
+  animation: enter 300ms ease-out;
+}
+
+/* Text selection */
+::selection {
+  background: var(--accent-primary);
+  color: var(--neutral-900);
+}
+
+/* Focus ring for keyboard navigation */
+:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-base);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--neutral-400);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--neutral-600);
+}

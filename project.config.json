@@ -1,0 +1,47 @@
+{
+  "project": "entrepreneurs-os",
+  "devs": [
+    {
+      "name": "Quentin",
+      "deliverables": [
+        "Socle Commun",
+        "Agent Guide",
+        "Systeme de Credits",
+        "Avatar Client",
+        "Offre Irresistible",
+        "CMO AI - Strategie & Voix",
+        "CMO AI - Copywriter & Calendrier",
+        "CMO AI - Publication & Analytics",
+        "Landing Pages - Builder & Sections",
+        "Landing Pages - Copywriting IA & Editeur",
+        "Landing Pages - Funnels & Value Ladder",
+        "Landing Pages - Publication & Domaines",
+        "Landing Pages - Agent AI & Release",
+        "Branding AI - Generation",
+        "Branding AI - Integration Finale"
+      ]
+    },
+    {
+      "name": "Leonard",
+      "deliverables": [
+        "Socle Commun",
+        "Agent Guide",
+        "Systeme de Credits",
+        "Finances AI - Onboarding Wizard",
+        "Finances AI - Dashboard Pilotage",
+        "Finances AI - Alertes & Saisie",
+        "Finances AI - Polish & Release",
+        "Brain Client - Profil & Veille",
+        "Brain Client - Fiches & Playbooks",
+        "Brain Client - Integration & Release",
+        "Finances AI P2 - Previsionnel",
+        "Finances AI P2 - Rapports & Release",
+        "Brain V2 - Intelligence Sectorielle",
+        "Agent Guide V2 - Contexte Enrichi",
+        "Integration Finale"
+      ]
+    }
+  ],
+  "environments": ["dev", "prod"],
+  "commitPrefix": "[entrepreneurs-os]"
+}

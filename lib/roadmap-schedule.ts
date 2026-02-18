@@ -1,0 +1,178 @@
+export interface DeliverableEntry {
+  title: string;
+  description: string;
+}
+
+export interface WeekSchedule {
+  week: string;
+  label: string;
+  sync?: string;
+  devs: Record<string, DeliverableEntry[]>;
+}
+
+export const roadmapSchedule: WeekSchedule[] = [
+  {
+    week: "S1",
+    label: "Sprint 0 — Socle Commun",
+    sync: "S0 — 5 jours ensemble",
+    devs: {
+      Quentin: [
+        { title: "Socle Commun", description: "Schema DB, conventions, architecture" },
+        { title: "Agent Guide", description: "Composant React overlay, highlight, steps" },
+        { title: "Systeme de Credits", description: "Grille tarification, dashboard, Stripe" },
+      ],
+      Leonard: [
+        { title: "Socle Commun", description: "Schema DB, pipeline CI/CD, config AI" },
+        { title: "Agent Guide", description: "Integration IA, mode conversationnel" },
+        { title: "Systeme de Credits", description: "Tables credit_balance/transaction, API" },
+      ],
+    },
+  },
+  {
+    week: "S2",
+    label: "Fondations positionnement + Finances onboarding",
+    devs: {
+      Quentin: [
+        { title: "Avatar Client", description: "Interview guidee IA, 3 personas, carte d'empathie" },
+      ],
+      Leonard: [
+        { title: "Finances AI - Onboarding Wizard", description: "Schema DB financier, wizard 5 etapes, import CSV" },
+      ],
+    },
+  },
+  {
+    week: "S3",
+    label: "Offre + Dashboard financier",
+    devs: {
+      Quentin: [
+        { title: "Offre Irresistible", description: "Value Equation Hormozi, stack de valeur, pitch-ready" },
+      ],
+      Leonard: [
+        { title: "Finances AI - Dashboard Pilotage", description: "Revenue, rentabilite, cash, KPI cards" },
+      ],
+    },
+  },
+  {
+    week: "S4",
+    label: "CMO Strategie + Alertes financieres",
+    devs: {
+      Quentin: [
+        { title: "CMO AI - Strategie & Voix", description: "Entretien Cedric, audit LinkedIn, matrice contenu" },
+      ],
+      Leonard: [
+        { title: "Finances AI - Alertes & Saisie", description: "Moteur alertes Inngest, saisie mensuelle, resume IA" },
+      ],
+    },
+  },
+  {
+    week: "S5",
+    label: "CMO Copywriter + Finances release",
+    sync: "SYNC 1 — Finances dispo pour agents, Avatar/Offre dans Brain",
+    devs: {
+      Quentin: [
+        { title: "CMO AI - Copywriter & Calendrier", description: "Generation Schwartz/Halbert/Cialdini, batch, calendrier" },
+      ],
+      Leonard: [
+        { title: "Finances AI - Polish & Release", description: "Objectifs vs Realite, detection business model, release" },
+      ],
+    },
+  },
+  {
+    week: "S6",
+    label: "CMO Publication + Brain profil",
+    devs: {
+      Quentin: [
+        { title: "CMO AI - Publication & Analytics", description: "LinkedIn API, autopilot, analytics, community manager" },
+      ],
+      Leonard: [
+        { title: "Brain Client - Profil & Veille", description: "Architecture Brain, fiche business, scan concurrents" },
+      ],
+    },
+  },
+  {
+    week: "S7",
+    label: "Landing Pages builder + Brain fiches",
+    devs: {
+      Quentin: [
+        { title: "Landing Pages - Builder & Sections", description: "Architecture builder, 15 sections, 3 templates funnels" },
+      ],
+      Leonard: [
+        { title: "Brain Client - Fiches & Playbooks", description: "Fiches concurrentielles, playbooks, validation humaine" },
+      ],
+    },
+  },
+  {
+    week: "S8",
+    label: "Landing Pages editeur + Brain release",
+    devs: {
+      Quentin: [
+        { title: "Landing Pages - Copywriting IA & Editeur", description: "Copywriting Hook/Story/Offer, editeur Webflow, Agent AI V1" },
+      ],
+      Leonard: [
+        { title: "Brain Client - Integration & Release", description: "Timeline business, score completude, integration agents" },
+      ],
+    },
+  },
+  {
+    week: "S9",
+    label: "Funnels armada + Previsionnel",
+    devs: {
+      Quentin: [
+        { title: "Landing Pages - Funnels & Value Ladder", description: "6 types funnels, Value Ladder, connexion entre pages" },
+      ],
+      Leonard: [
+        { title: "Finances AI P2 - Previsionnel", description: "Projections 3 scenarios, simulations What-if, objectifs" },
+      ],
+    },
+  },
+  {
+    week: "S10",
+    label: "Pages live + Rapports financiers",
+    sync: "SYNC 2 — Landing Pages connectees aux KPIs finances",
+    devs: {
+      Quentin: [
+        { title: "Landing Pages - Publication & Domaines", description: "Publication 1 clic, domaine custom, CNAME + SSL" },
+      ],
+      Leonard: [
+        { title: "Finances AI P2 - Rapports & Release", description: "P&L mensuel auto, resume executif IA, partage securise" },
+      ],
+    },
+  },
+  {
+    week: "S11",
+    label: "Landing Pages release + Brain V2",
+    devs: {
+      Quentin: [
+        { title: "Landing Pages - Agent AI & Release", description: "Agent AI V2, 30+ sections, duplication, optimisations" },
+      ],
+      Leonard: [
+        { title: "Brain V2 - Intelligence Sectorielle", description: "Benchmarks INSEE/SaaS, opportunites, recommandations" },
+      ],
+    },
+  },
+  {
+    week: "S12",
+    label: "Branding AI + Agent Guide V2",
+    devs: {
+      Quentin: [
+        { title: "Branding AI - Generation", description: "Colorimetrie IA, logos, brand board, retroactif" },
+      ],
+      Leonard: [
+        { title: "Agent Guide V2 - Contexte Enrichi", description: "Brain complet, mode proactif, navigation cross-module" },
+      ],
+    },
+  },
+  {
+    week: "S13",
+    label: "Integration finale + Demo",
+    sync: "SYNC 3 — 3 jours integration, tests E2E, demo finale",
+    devs: {
+      Quentin: [
+        { title: "Branding AI - Integration Finale", description: "Visuels brandes, theming complet, demo finale" },
+      ],
+      Leonard: [
+        { title: "Integration Finale", description: "Test E2E parcours complet, feature flags, polish" },
+      ],
+    },
+  },
+];
