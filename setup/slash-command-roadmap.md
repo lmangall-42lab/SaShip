@@ -2,45 +2,34 @@
 
 ## Installation
 
-Create the file `.claude/commands/roadmap.md` in your **client dev repo**:
+1. Copy `roadmap.json` from the tracking repo's `content/roadmap.json` into `.saship/roadmap.json` in your **client dev repo**.
+
+2. Create the file `.claude/commands/roadmap.md` in your **client dev repo**:
 
 ```markdown
-Fetch the current roadmap state from the SaShip tracking repo.
+Read the local roadmap file at `.saship/roadmap.json` and cross-reference it with recent git activity.
 
-The tracking repo and branch are configured as repository variables:
-- TRACKING_REPO (e.g. `org/saship-tracking`)
-- TRACKING_BRANCH (e.g. `project-x`)
-
-If these variables are not available, check `.github/workflows/saship-digest.yml` for the values, or ask the user.
+The roadmap file has a `startDate` (ISO date for S1 Monday) and a `weeks` array. Each week entry has a `week` code (S1–S13), `label`, optional `sync` milestone, and `devs` mapping developer names to their planned deliverables.
 
 Steps:
 
-1. Use `gh api` to list MDX files from the tracking repo:
-   ```
-   gh api repos/{TRACKING_REPO}/contents/content --ref {TRACKING_BRANCH}
-   ```
+1. Read `.saship/roadmap.json` from the repo root.
 
-2. For each `.mdx` file returned, fetch its raw content:
-   ```
-   gh api repos/{TRACKING_REPO}/contents/content/{filename} --ref {TRACKING_BRANCH} -q .content | base64 -d
-   ```
+2. Determine the current sprint week using the `startDate` field. Each week is 7 calendar days starting from that Monday. Calculate which S-week today falls in. If before startDate, show "Not started yet (S1 begins {startDate})". If after S13, show "Project complete".
 
-3. Parse the YAML frontmatter from each file (title, owner, status, environment).
+3. Run `git log --oneline --since="1 week ago"` to get recent commits.
 
-4. Also fetch `project.config.json` the same way to get the project name.
+4. Present a roadmap summary:
+   - **Current sprint week** (e.g. S6) and its label
+   - **This week's plan** — for each dev, list their planned deliverables for the current week
+   - **Recent commits** — show the last week's commits and indicate which roadmap deliverable each one maps to (match by keywords in the commit message against deliverable titles/descriptions)
+   - **Coverage** — flag any planned deliverables for the current week that have zero matching commits (potential gaps)
+   - If there is a `sync` milestone on the current or next week, highlight it
 
-5. Present a roadmap summary:
-   - **Project name** from config
-   - A table of all deliverables with columns: Deliverable | Owner | Status | Environment
-   - Group by status in this order: in-dev, in-review, deployed
-   - For each non-deployed deliverable, show the **latest changelog entry** (most recent date and its content)
+5. If the user provides arguments (e.g. `/roadmap S3`), show that specific week instead of the current one.
 
 Keep the output concise and scannable. Use terminal-friendly formatting.
 ```
-
-## Prerequisites
-
-The dev must have the `gh` CLI installed and authenticated with access to the tracking repo.
 
 ## Usage
 
@@ -50,4 +39,10 @@ From your client dev repo, run:
 /roadmap
 ```
 
-Claude will fetch the MDX roadmap files from the tracking repo and print a status summary showing what's deployed, what's in development, and what's in review.
+Claude will read the local roadmap, show the current sprint plan, and cross-reference with recent commits to highlight progress and gaps.
+
+To view a specific week:
+
+```bash
+/roadmap S3
+```

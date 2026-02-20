@@ -57,18 +57,26 @@ Each step is a collapsible group:
 | Group | Success looks like | Failure looks like |
 |---|---|---|
 | **Commit collection** | `Found 3 commit(s)` + JSON array with `status` field per commit | `::warning:: No commits with prefix...` |
+| **Update commit log** | `Updated content/commits.mdx with N new commit(s)` | `::error:: Failed to update content/commits.mdx` |
 | **Fetch roadmap context** | `Found N existing roadmap entries` + JSON array of slugs/status | Empty array (no MDX files yet — OK for first run) |
 | **AI Gateway request** | `HTTP status: 200` + `response received (N chars)` | `::error:: HTTP 401/500` + response body |
 | **Slack post** | `HTTP status: 200` + `posted successfully` | `::error:: HTTP 4xx` (non-blocking) |
 | **MDX updates** | `Updated content/socle-commun-quentin.mdx (HTTP 201)` per file | `::error:: Failed to update ... (HTTP 4xx)` |
+| **Extras update** | `Updated content/extras.json` or `No extras updates` | `::error:: Failed to update content/extras.json` |
 | **Stats update** | `Updated stats.json (HTTP 200)` | `::error:: Failed to update stats.json` |
+| **Sync log** | `Updated sync-log.json (HTTP 200)` | `::error:: Failed to update sync-log.json` |
 
 ## Verify results
 
 After a successful run, check the tracking repo (`entrepreneurs-os` branch):
 
+- `content/commits.mdx` — ALL commits listed as bullet points (prefix stripped, no date/time)
+- `content/extras.json` — any resolved extras marked as `"done"` (if applicable)
 - `content/*.mdx` — new changelog entries appended under `## Changelog`
 - `stats.json` — `commitsPerDev` and `lastUpdated` updated
+- `sync-log.json` — `lastSync` timestamp and new entry in `runs[]`
+
+All commits on the tracking repo should be prefixed with `[bot]` (e.g. `[bot] update: socle-commun-quentin digest 2026-02-19`).
 
 ## Common issues
 

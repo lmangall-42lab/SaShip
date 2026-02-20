@@ -1,0 +1,204 @@
+# Slack notification on merge to main or staging
+# Waits for Vercel deployment to succeed, then collects all commits,
+# rephrases them in customer-friendly language via AI, and posts to Slack.
+#
+# Required secrets (already set for saship-digest):
+#   AI_GATEWAY_API_KEY   — Vercel AI Gateway API key
+#   SLACK_WEBHOOK_URL    — Slack incoming webhook
+
+name: Slack Merge Notify
+
+on:
+  push:
+    branches: [main, staging]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Wait for Vercel deployment
+        id: vercel
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHA="${{ github.sha }}"
+          echo "Waiting for Vercel deployment on $SHA..."
+
+          MAX_WAIT=600  # 10 minutes
+          INTERVAL=20
+          ELAPSED=0
+
+          while [ "$ELAPSED" -lt "$MAX_WAIT" ]; do
+            # Check deployment statuses on this commit (Vercel creates these)
+            STATUSES=$(gh api "/repos/${{ github.repository }}/deployments?sha=$SHA&per_page=5" 2>/dev/null || echo "[]")
+
+            # Look for a Vercel deployment
+            DEPLOY_ID=$(echo "$STATUSES" | jq -r '[.[] | select(.creator.login == "vercel[bot]" or .environment == "Production" or .environment == "Preview")] | first | .id // empty')
+
+            if [ -n "$DEPLOY_ID" ]; then
+              # Check the status of this deployment
+              STATE=$(gh api "/repos/${{ github.repository }}/deployments/$DEPLOY_ID/statuses?per_page=1" 2>/dev/null \
+                | jq -r '.[0].state // "pending"')
+
+              echo "Deployment $DEPLOY_ID state: $STATE (${ELAPSED}s elapsed)"
+
+              if [ "$STATE" = "success" ]; then
+                echo "deploy_ok=true" >> "$GITHUB_OUTPUT"
+                DEPLOY_URL=$(gh api "/repos/${{ github.repository }}/deployments/$DEPLOY_ID/statuses?per_page=1" \
+                  | jq -r '.[0].environment_url // empty')
+                echo "deploy_url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
+                exit 0
+              elif [ "$STATE" = "failure" ] || [ "$STATE" = "error" ]; then
+                echo "::error::Vercel deployment failed"
+                echo "deploy_ok=false" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+            else
+              echo "No Vercel deployment found yet (${ELAPSED}s elapsed)"
+            fi
+
+            sleep "$INTERVAL"
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+
+          echo "::warning::Timed out waiting for Vercel deployment"
+          echo "deploy_ok=timeout" >> "$GITHUB_OUTPUT"
+
+      - name: Collect merge commits
+        if: steps.vercel.outputs.deploy_ok == 'true'
+        id: commits
+        run: |
+          BEFORE="${{ github.event.before }}"
+          AFTER="${{ github.event.after }}"
+
+          # If before is all zeros (new branch), just use the head commit
+          if echo "$BEFORE" | grep -qE '^0+$'; then
+            COMMITS=$(git log -1 --pretty=format:'%s' "$AFTER")
+          else
+            COMMITS=$(git log --pretty=format:'%s' "${BEFORE}..${AFTER}")
+          fi
+
+          if [ -z "$COMMITS" ]; then
+            echo "no_commits=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "no_commits=false" >> "$GITHUB_OUTPUT"
+          echo "commits<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$COMMITS" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Rephrase with AI
+        if: steps.vercel.outputs.deploy_ok == 'true' && steps.commits.outputs.no_commits != 'true'
+        id: ai
+        env:
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          RAW_COMMITS: ${{ steps.commits.outputs.commits }}
+        run: |
+          BRANCH="${GITHUB_REF_NAME}"
+
+          if [ "$BRANCH" = "main" ]; then
+            ENV_LABEL="production"
+          else
+            ENV_LABEL="staging"
+          fi
+
+          cat > /tmp/prompt.txt <<PROMPT_EOF
+          Tu rediges une mise a jour Slack detaillee pour des personnes non-techniques (fondateurs, chefs de projet, clients).
+
+          De nouveaux changements viennent d'etre deployes en ${ENV_LABEL}. Voici les messages de commit bruts :
+
+          ${RAW_COMMITS}
+
+          Reecris-les sous forme d'une liste a puces detaillee (format Slack mrkdwn) comprehensible par une personne non-technique.
+          Regles :
+          - Ecris en francais
+          - Utilise un langage simple : ce qui a change pour l'utilisateur ou le produit, pas comment c'est code
+          - Aucun jargon technique (pas de "refactor", "fix lint", "bump deps", "merge branch", "CI", etc.)
+          - Explique TOUS les changements, meme techniques — traduis-les en impact concret (ex: "fix lint" → "Correction de problemes de qualite de code", "update CI" → "Mise a jour du systeme de deploiement automatique")
+          - Chaque puce commence par •
+          - Donne suffisamment de detail pour que le lecteur comprenne ce qui a change et pourquoi c'est utile, 1-2 phrases par puce
+          - N'inclus aucun lien ni URL
+          - Si tous les commits sont purement techniques, reponds exactement : NO_USER_FACING_CHANGES
+
+          Reponds avec UNIQUEMENT la liste a puces (ou NO_USER_FACING_CHANGES). Pas d'introduction, pas de conclusion.
+          PROMPT_EOF
+
+          jq -n --rawfile content /tmp/prompt.txt \
+            '{model:"anthropic/claude-haiku-4-5",max_tokens:512,messages:[{role:"user",content:$content}]}' \
+            > /tmp/ai_request.json
+
+          HTTP_CODE=$(curl -s -o /tmp/ai_response.json -w "%{http_code}" \
+            https://ai-gateway.vercel.sh/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $AI_GATEWAY_API_KEY" \
+            -d @/tmp/ai_request.json)
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::warning::AI Gateway returned HTTP $HTTP_CODE — falling back to raw commits"
+            echo "fallback=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          SUMMARY=$(jq -r '.choices[0].message.content' /tmp/ai_response.json)
+
+          if [ "$SUMMARY" = "NO_USER_FACING_CHANGES" ]; then
+            echo "no_user_changes=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "fallback=false" >> "$GITHUB_OUTPUT"
+          echo "no_user_changes=false" >> "$GITHUB_OUTPUT"
+          echo "summary<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$SUMMARY" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Post success to Slack
+        if: steps.vercel.outputs.deploy_ok == 'true' && steps.commits.outputs.no_commits != 'true' && steps.ai.outputs.no_user_changes != 'true'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RAW_COMMITS: ${{ steps.commits.outputs.commits }}
+          AI_SUMMARY: ${{ steps.ai.outputs.summary }}
+          AI_FALLBACK: ${{ steps.ai.outputs.fallback }}
+        run: |
+          BRANCH="${GITHUB_REF_NAME}"
+          AUTHOR="${{ github.event.head_commit.author.name }}"
+
+          if [ "$BRANCH" = "main" ]; then
+            EMOJI=":rocket:"
+            LABEL="production"
+          else
+            EMOJI=":construction:"
+            LABEL="staging"
+          fi
+
+          if [ "$AI_FALLBACK" = "true" ]; then
+            BODY=$(echo "$RAW_COMMITS" | sed 's/^/• /')
+          else
+            BODY="$AI_SUMMARY"
+          fi
+
+          TEXT="${EMOJI} *Disponible en ${LABEL}*\n\n${BODY}"
+
+          curl -s -X POST "$SLACK_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg text "$TEXT" '{text: $text}')"
+
+      - name: Post failure to Slack
+        if: steps.vercel.outputs.deploy_ok == 'false'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          BRANCH="${GITHUB_REF_NAME}"
+          AUTHOR="${{ github.event.head_commit.author.name }}"
+
+          TEXT=":x: *Echec du deploiement* sur ${BRANCH}\nMerge par _${AUTHOR}_ — le deploiement Vercel a echoue. Verifiez le dashboard Vercel."
+
+          curl -s -X POST "$SLACK_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg text "$TEXT" '{text: $text}')"
