@@ -23,7 +23,8 @@ export function Nav({ projectName, lastSync }: { projectName: string; lastSync?:
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
         <Link href="/" className="flex items-center gap-3">
           <span className="flex items-center gap-0">
-            <Image src="/logo-42lab.svg" alt="42Lab.co" width={140} height={28} className="rounded-l" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-42lab.svg" alt="42Lab.co" width={140} height={28} className="rounded-l" />
             <span className="rounded-r bg-[#D4F53C] px-2 py-[5px] text-[11px] font-semibold uppercase tracking-[0.12em] text-[#1a1a1a]">
               SaShip
             </span>
