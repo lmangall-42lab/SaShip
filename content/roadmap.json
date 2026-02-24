@@ -12,7 +12,7 @@
           { "title": "Systeme de Credits", "description": "Grille tarification, dashboard, Stripe" }
         ],
         "Leonard": [
-          { "title": "Socle Commun", "description": "Schema DB, pipeline CI/CD, config AI" },
+          { "title": "Socle Commun", "description": "Schema DB, conventions, architecture" },
           { "title": "Agent Guide", "description": "Integration IA, mode conversationnel" },
           { "title": "Systeme de Credits", "description": "Tables credit_balance/transaction, API" }
         ]
@@ -47,7 +47,7 @@
       "label": "CMO Strategie + Alertes financieres",
       "devs": {
         "Quentin": [
-          { "title": "CMO AI - Strategie & Voix", "description": "Entretien Cedric, audit LinkedIn, matrice contenu" }
+          { "title": "CMO AI - Strategie & Voix", "description": "S'adapter a la marque et comm voulue, audit LinkedIn, matrice contenu" }
         ],
         "Leonard": [
           { "title": "Finances AI - Alertes & Saisie", "description": "Moteur alertes Inngest, saisie mensuelle, resume IA" }
