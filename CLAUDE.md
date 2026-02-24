@@ -49,7 +49,7 @@ Each project branch has a `sync-log.json` that records every Action run:
 
 ## GitHub Actions (installed on client dev repo, templates in `setup/`)
 
-- `saship-digest.yml` — daily cron (6 PM UTC weekdays) + manual trigger. Collects commits, AI-summarizes them, updates MDX/extras/stats on the tracking repo, posts daily Slack digest.
+- `saship-digest.yml` — daily cron (7:30 AM UTC+1 weekdays) + manual trigger. Collects all commits from the previous day across all branches for the commit log page, then filters by project prefix for AI matching. Updates MDX/extras/stats/sync-log on the tracking repo, posts daily Slack digest.
 - `slack-merge-notify.yml` — triggers on push to `main`, `staging`, or `dev/*`. Waits for Vercel deployment to succeed (skipped for dev branches), collects all commits in the merge, rephrases them in customer-friendly language via AI, and posts to Slack. Dev branches post in French with the author's name ("Léonard a ajouté à l'environnement de développement"). Posts a failure alert if Vercel deploy fails.
 
 **IMPORTANT — keep workflows in sync:** The live workflow files live in the client dev repo (`.github/workflows/`). The templates in `setup/` on this repo must always mirror them. When editing a workflow, update BOTH the client repo copy and the `setup/` template here. The only acceptable differences are project-specific values (Slack user IDs, project names).

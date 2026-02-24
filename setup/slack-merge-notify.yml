@@ -112,6 +112,10 @@ jobs:
           echo "$COMMITS" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
 
+          # Extract project name from commit prefix (e.g. [EOS] -> "EOS")
+          PROJECT=$(echo "$COMMITS" | grep -oE '^\[([^]]+)\]' | head -1 | tr -d '[]')
+          echo "project=${PROJECT}" >> "$GITHUB_OUTPUT"
+
       - name: Rephrase with AI
         if: steps.vercel.outputs.deploy_ok == 'true' && steps.commits.outputs.no_commits != 'true'
         id: ai
@@ -143,6 +147,7 @@ jobs:
           - Aucun jargon technique (pas de "refactor", "fix lint", "bump deps", "merge branch", "CI", etc.)
           - Explique TOUS les changements, meme techniques — traduis-les en impact concret (ex: "fix lint" → "Correction de problemes de qualite de code", "update CI" → "Mise a jour du systeme de deploiement automatique")
           - Chaque puce commence par •
+          - Pour mettre en gras utilise *simple asterisques* (format Slack mrkdwn), JAMAIS **double asterisques** (Markdown standard)
           - Donne suffisamment de detail pour que le lecteur comprenne ce qui a change et pourquoi c'est utile, 1-2 phrases par puce
           - N'inclus aucun lien ni URL
 
@@ -167,6 +172,9 @@ jobs:
 
           SUMMARY=$(jq -r '.choices[0].message.content' /tmp/ai_response.json)
 
+          # Fix AI sometimes using **double asterisks** (Markdown) instead of *single* (Slack mrkdwn)
+          SUMMARY=$(echo "$SUMMARY" | sed 's/\*\*\([^*]*\)\*\*/\*\1\*/g')
+
           echo "fallback=false" >> "$GITHUB_OUTPUT"
           echo "summary<<EOF" >> "$GITHUB_OUTPUT"
           echo "$SUMMARY" >> "$GITHUB_OUTPUT"
@@ -189,22 +197,29 @@ jobs:
           fi
 
           AUTHOR="${{ github.event.head_commit.author.name }}"
+          PROJECT="${{ steps.commits.outputs.project }}"
+          # Build label: "EOS " or "" if no prefix detected
+          if [ -n "$PROJECT" ]; then
+            PROJ_LABEL="${PROJECT} "
+          else
+            PROJ_LABEL=""
+          fi
 
           if [ "$BRANCH" = "main" ]; then
             {
-              echo "*Mise en production effectuee* :rocket:"
+              echo "*Mise en production ${PROJ_LABEL}effectuee* :rocket:"
               echo ""
               echo "$BODY"
             } > /tmp/slack_text.txt
           elif echo "$BRANCH" | grep -q "^dev/"; then
             {
-              echo ":hammer_and_wrench: *${AUTHOR} a ajouté à l'environnement de développement*"
+              echo ":hammer_and_wrench: *${AUTHOR} a ajouté à l'environnement de développement ${PROJ_LABEL}*"
               echo ""
               echo "$BODY"
             } > /tmp/slack_text.txt
           else
             {
-              echo "*Nouveau deploiement en staging* :construction:"
+              echo "*Nouveau deploiement ${PROJ_LABEL}en staging* :construction:"
               echo ""
               echo "$BODY"
               echo ""
@@ -217,20 +232,3 @@ jobs:
             -H "Content-Type: application/json" \
             -d @/tmp/slack_payload.json
 
-      - name: Post failure to Slack
-        if: steps.vercel.outputs.deploy_ok == 'false'
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        run: |
-          BRANCH="${GITHUB_REF_NAME}"
-          AUTHOR="${{ github.event.head_commit.author.name }}"
-
-          {
-            echo ":x: *Echec du deploiement* sur ${BRANCH}"
-            echo "Merge par _${AUTHOR}_ — le deploiement Vercel a echoue. Verifiez le dashboard Vercel."
-          } > /tmp/slack_text.txt
-
-          jq -n --rawfile text /tmp/slack_text.txt '{text: $text}' > /tmp/slack_payload.json
-          curl -s -X POST "$SLACK_WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -d @/tmp/slack_payload.json

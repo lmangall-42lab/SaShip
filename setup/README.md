@@ -58,6 +58,8 @@ Go to the **client dev repo** on GitHub > **Settings > Secrets and Variables > A
 
 Copy `setup/github-action.yml` to `.github/workflows/saship-digest.yml` in the **client dev repo**.
 
+This workflow runs automatically at **7:30 AM UTC+1 on weekdays** (6:30 UTC) and can also be triggered manually.
+
 The required secrets and variables were already configured in step 3.
 
 ### 5. Install the Slack merge notify workflow on the client dev repo

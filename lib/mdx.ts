@@ -91,6 +91,7 @@ export function groupByEnvironment(
 export interface CommitEntry {
   message: string;
   author: string;
+  date: string;
 }
 
 export async function getCommitLog(): Promise<CommitEntry[]> {
@@ -98,16 +99,22 @@ export async function getCommitLog(): Promise<CommitEntry[]> {
     const filePath = path.join(CONTENT_DIR, "commits.mdx");
     const raw = await fs.readFile(filePath, "utf-8");
     const entries: CommitEntry[] = [];
+    let currentDate = "";
 
     for (const line of raw.split("\n")) {
       const trimmed = line.trim();
+      const dateMatch = trimmed.match(/^### (\d{4}-\d{2}-\d{2})$/);
+      if (dateMatch) {
+        currentDate = dateMatch[1];
+        continue;
+      }
       if (!trimmed.startsWith("- ")) continue;
       const text = trimmed.slice(2);
       const match = text.match(/^(.+?)\s*—\s*\*(.+?)\*$/);
       if (match) {
-        entries.push({ message: match[1].trim(), author: match[2].trim() });
+        entries.push({ message: match[1].trim(), author: match[2].trim(), date: currentDate });
       } else {
-        entries.push({ message: text, author: "" });
+        entries.push({ message: text, author: "", date: currentDate });
       }
     }
 

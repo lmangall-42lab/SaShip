@@ -35,21 +35,34 @@ export default async function CommitsPage() {
             </span>
           </div>
           <div className="divide-y divide-border-default">
-            {commits.map((commit, i) => (
-              <div key={i} className="flex">
-                <div className="w-1 shrink-0 bg-accent/40" />
-                <div className="flex-1 px-4 py-3">
-                  <p className="text-[12px] leading-relaxed text-text-secondary">
-                    {commit.message}
-                    {commit.author && (
-                      <span className="ml-2 text-[10px] uppercase tracking-[0.15em] text-text-muted">
-                        — {commit.author}
+            {commits.map((commit, i) => {
+              const prevDate = i > 0 ? commits[i - 1].date : null;
+              const showDate = commit.date && commit.date !== prevDate;
+              return (
+                <div key={i}>
+                  {showDate && (
+                    <div className="border-b border-border-default bg-neutral-50 px-4 py-2">
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">
+                        {commit.date}
                       </span>
-                    )}
-                  </p>
+                    </div>
+                  )}
+                  <div className="flex">
+                    <div className="w-1 shrink-0 bg-accent/40" />
+                    <div className="flex-1 px-4 py-3">
+                      <p className="text-[12px] leading-relaxed text-text-secondary">
+                        {commit.message}
+                        {commit.author && (
+                          <span className="ml-2 text-[10px] uppercase tracking-[0.15em] text-text-muted">
+                            — {commit.author}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

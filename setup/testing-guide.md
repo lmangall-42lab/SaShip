@@ -15,8 +15,8 @@
 | Variable | Value |
 |---|---|
 | `TRACKING_REPO` | `<org>/SaShip` |
-| `TRACKING_BRANCH` | `entrepreneurs-os` |
-| `COMMIT_PREFIX` | `[entrepreneurs-os]` |
+| `TRACKING_BRANCH` | `EOS` |
+| `COMMIT_PREFIX` | `[EOS]` |
 
 ### Workflow file
 
@@ -35,10 +35,10 @@ git push
 Run these from any branch on the client dev repo. Empty commits are fine — the action only reads git log messages.
 
 ```bash
-git commit --allow-empty -m "[entrepreneurs-os] feat(socle-commun): add auth middleware and session management"
-git commit --allow-empty -m "[entrepreneurs-os] feat(agent-guide): implement onboarding wizard first steps"
-git commit --allow-empty -m "[entrepreneurs-os] fix(systeme-de-credits): fix credit deduction on failed transactions"
-git commit --allow-empty -m "[entrepreneurs-os] chore: update linter config"
+git commit --allow-empty -m "[EOS] feat(socle-commun): add auth middleware and session management"
+git commit --allow-empty -m "[EOS] feat(agent-guide): implement onboarding wizard first steps"
+git commit --allow-empty -m "[EOS] fix(systeme-de-credits): fix credit deduction on failed transactions"
+git commit --allow-empty -m "[EOS] chore: update linter config"
 git push
 ```
 
@@ -68,7 +68,7 @@ Each step is a collapsible group:
 
 ## Verify results
 
-After a successful run, check the tracking repo (`entrepreneurs-os` branch):
+After a successful run, check the tracking repo (`EOS` branch):
 
 - `content/commits.mdx` — ALL commits listed as bullet points (prefix stripped, no date/time)
 - `content/extras.json` — any resolved extras marked as `"done"` (if applicable)

@@ -15,7 +15,7 @@ name: SaShip Daily Digest
 
 on:
   schedule:
-    - cron: "30 6 * * 1-5" # Weekdays at 7:30 AM UTC+1 (6:30 UTC)
+    - cron: "30 5 * * 1-5" # Weekdays at 7:30 AM CEST (5:30 UTC)
   workflow_dispatch: {}
 
 permissions:
@@ -125,7 +125,10 @@ jobs:
           printenv ALL_COMMITS_JSON > /tmp/commits_for_log.json
 
           # Format commits as markdown bullet list, stripping the project prefix
-          BULLET_LIST=$(jq -r '.[] | "- " + (.message | gsub("^\\[.*?\\] *"; "")) + " — *" + .author + "*"' /tmp/commits_for_log.json)
+          # Add a date heading so the frontend can group commits by day
+          YESTERDAY=$(date -u -d "yesterday" +%Y-%m-%d 2>/dev/null || date -u -v-1d +%Y-%m-%d)
+          TODAY_HEADING="### $YESTERDAY"
+          BULLET_LIST=$(printf '%s\n%s' "$TODAY_HEADING" "$(jq -r '.[] | "- " + (.message | gsub("^\\[.*?\\] *"; "")) + " — *" + .author + "*"' /tmp/commits_for_log.json)")
 
           if [ -z "$BULLET_LIST" ]; then
             echo "No commits to add to commit log"
@@ -318,7 +321,7 @@ jobs:
           5. Ecris une entree de changelog EN FRANCAIS pour chaque livrable associe. Format :
              ### $TODAY
              <resume concis en francais> — *<Auteur>*
-          6. Ecris un digest Slack quotidien EN FRANCAIS groupe par developpeur, puis par environnement (dev/prod). Utilise du francais simple, pas les messages de commit bruts.
+          6. Ecris un digest Slack quotidien EN FRANCAIS groupe par developpeur, puis par environnement (dev/prod). Utilise du francais simple, pas les messages de commit bruts. Pour le gras, utilise *simple asterisques* (format Slack mrkdwn), JAMAIS **double asterisques**. Le titre du message doit etre "Entrepreneur OS — avancées du <date du jour>" (PAS "Déploiements du jour").
           7. Si un commit resout ou complete clairement un element des DEVELOPPEMENTS SUPPLEMENTAIRES, inclus-le dans "extras_updates" avec l'"id" exact de l'element et le statut "done". Ne marque comme done que si le commit traite reellement l'extra — ne force pas d'associations.
 
           Reponds au format JSON :
@@ -397,6 +400,8 @@ jobs:
         run: |
           RESPONSE='${{ steps.summary.outputs.response }}'
           SLACK_MSG=$(echo "$RESPONSE" | jq -r '.slack_message // empty')
+          # Append SaShip tracking link
+          SLACK_MSG=$(printf '%s\n\n<https://eos.saship.42lab.co/|Voir l'\''avancée sur SaShip>' "$SLACK_MSG")
 
           if [ -z "$SLACK_MSG" ]; then
             echo "::warning::No slack_message found in AI response — skipping Slack post"

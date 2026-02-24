@@ -3,7 +3,7 @@
 ## Repo Structure
 
 ```
-SaShip/ (branch: entrepreneurs-os)
+SaShip/ (branch: EOS)
 ├── app/                    # Next.js 16 App Router pages
 │   ├── globals.css         # Design tokens + Tailwind v4
 │   ├── layout.tsx          # Root layout (Nav, IBM Plex Mono font)
@@ -41,7 +41,7 @@ Dev uses /ship →
        ▼
 GitHub Action (daily cron or manual)
   1. Collects last 24h commits
-     with [entrepreneurs-os] prefix
+     with [EOS] prefix
   2. Determines env from branch:
      staging → in-dev
      main/production → deployed
@@ -119,7 +119,7 @@ Static-generated via `generateStaticParams()`. Shows title, status badge, enviro
 
 ## Content (6 MDX files)
 
-All 6 files are Sprint 0 deliverables for the "entrepreneurs-os" project, with `status: in-dev` and `environment: dev`:
+All 6 files are Sprint 0 deliverables for the "EOS" project, with `status: in-dev` and `environment: dev`:
 
 | File | Owner | Deliverable |
 |---|---|---|
