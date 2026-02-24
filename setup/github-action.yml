@@ -62,14 +62,18 @@ jobs:
             AUTHOR=$(echo "$line" | cut -d'|' -f2)
             MESSAGE=$(echo "$line" | cut -d'|' -f3-)
             # Determine environment by checking which branches contain this commit
-            ENV="staging"
+            ENV="dev"
             if git branch -a --contains "$HASH" 2>/dev/null | grep -qE "main$|master$|production$|remotes/origin/main$|remotes/origin/master$|remotes/origin/production$"; then
               ENV="prod"
+            elif git branch -a --contains "$HASH" 2>/dev/null | grep -qE "staging$|remotes/origin/staging$"; then
+              ENV="staging"
             fi
-            # Determine status from branch: main/production = deployed, staging = in-staging
-            STATUS="in-staging"
+            # Determine status from branch: main/production = deployed, staging = staging
+            STATUS="in-dev"
             if [ "$ENV" = "prod" ]; then
               STATUS="deployed"
+            elif [ "$ENV" = "staging" ]; then
+              STATUS="staging"
             fi
             jq -n --arg h "$HASH" --arg a "$AUTHOR" --arg m "$MESSAGE" --arg e "$ENV" --arg s "$STATUS" \
               '{hash:$h, author:$a, message:$m, env:$e, status:$s}'
@@ -283,9 +287,9 @@ jobs:
 
           INSTRUCTIONS :
           1. Associe chaque commit a un livrable EXISTANT de la roadmap en utilisant le slug exact des entrees roadmap ci-dessus.
-          2. Si un commit correspond clairement a un livrable du PLANNING DES SPRINTS qui n'a PAS encore de fichier MDX, cree une nouvelle entree en suivant la convention : kebab-case-titre-prenomdev (ex: "finances-ai-onboarding-wizard-leonard").
+          2. Si un commit correspond clairement a un livrable du PLANNING DES SPRINTS qui n'a PAS encore de fichier MDX, cree une nouvelle entree. CRITICAL: le champ "title" DOIT etre le titre EXACT du PLANNING DES SPRINTS (ex: "Socle Commun", "Agent Guide", "Systeme de Credits") — ne reformule pas, ne traduis pas, n'ajoute pas de mots. Utilise la convention pour le slug : kebab-case-titre-prenomdev (ex: "socle-commun-leonard", "agent-guide-quentin").
           3. Si un commit ne correspond clairement a AUCUN livrable, IGNORE-LE — ne force pas d'association. Inclus-le uniquement dans le digest Slack sous une section "Autres changements".
-          4. NE determine PAS le statut toi-meme. Chaque commit a deja un champ "status" derive de sa branche (staging = "in-staging", main/production = "deployed"). Utilise cette valeur telle quelle.
+          4. NE determine PAS le statut toi-meme. Chaque commit a deja un champ "status" derive de sa branche (staging = "staging", main/production = "deployed", dev = "in-dev"). Utilise cette valeur telle quelle.
           5. Ecris une entree de changelog EN FRANCAIS pour chaque livrable associe. Format :
              ### $TODAY
              <resume concis en francais> — *<Auteur>*
@@ -301,7 +305,7 @@ jobs:
                 "title": "<titre du livrable — uniquement pour les nouveaux fichiers>",
                 "owner": "<auteur>",
                 "environment": "<staging|prod du commit>",
-                "status": "<in-staging|deployed du commit>",
+                "status": "<staging|deployed du commit>",
                 "entry": "### $TODAY\n<resume en francais> — *Auteur*"
               }
             ],
