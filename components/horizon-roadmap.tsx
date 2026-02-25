@@ -82,7 +82,7 @@ export function HorizonRoadmap({
     const timelineRect = timeline.getBoundingClientRect();
     const targetCenterInTimeline =
       targetRect.left - timelineRect.left + targetRect.width / 2;
-    setOffsetX(containerWidth * 0.75 - targetCenterInTimeline);
+    setOffsetX(containerWidth * 0.5 - targetCenterInTimeline);
   }, []);
 
   const shipped = items.filter((i) => i.status === "deployed").length;
