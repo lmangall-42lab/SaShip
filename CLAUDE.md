@@ -24,7 +24,7 @@ This is the **tracking repo**. It is a passive receiver — it does not contain 
 ## Data flow
 
 1. Devs commit in the client repo using the `/ship` slash command (proper prefix + conventional format)
-2. A daily GitHub Action on the client repo collects today's commits, determines environment from branch (staging → `in-staging`, main/production → `deployed`)
+2. A daily GitHub Action on the client repo collects today's commits, determines environment from branch (staging → `staging`, main/production → `deployed`)
 3. The Action appends ALL collected commits to `content/commits.mdx` (no AI — direct formatting, prefix stripped)
 4. The Action fetches roadmap context from the tracking repo: `project.config.json` + all existing MDX frontmatter (excluding `commits.mdx`)
 5. Commits + roadmap context + extras are sent to Claude API — Claude matches commits to existing deliverables, writes plain-English changelog entries, and marks resolved extras as done; unmatched commits are skipped in MDX but included in the Slack digest
@@ -45,7 +45,7 @@ Each project branch has a `sync-log.json` that records every Action run:
 
 ## MDX status values
 
-`in-staging`, `deployed` — the automated Action sets `in-staging` or `deployed` (derived from branch)
+`staging`, `deployed` — the automated Action sets `staging` or `deployed` (derived from branch)
 
 ## GitHub Actions (installed on client dev repo, templates in `setup/`)
 

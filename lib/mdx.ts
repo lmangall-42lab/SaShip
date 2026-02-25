@@ -27,9 +27,14 @@ export async function getAllDeliverables(): Promise<Deliverable[]> {
         const filePath = path.join(CONTENT_DIR, filename);
         const raw = await fs.readFile(filePath, "utf-8");
         const { data, content } = matter(raw);
+        const frontmatter = data as DeliverableFrontmatter;
+        // Normalize status: the Action may write "in-staging" but the UI expects "staging"
+        if ((frontmatter.status as string) === "in-staging") {
+          frontmatter.status = "staging";
+        }
         return {
           slug: filename.replace(/\.mdx$/, ""),
-          frontmatter: data as DeliverableFrontmatter,
+          frontmatter,
           content,
         };
       })
