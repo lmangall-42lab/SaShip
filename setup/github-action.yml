@@ -319,7 +319,7 @@ jobs:
           2. Si un commit correspond clairement a un livrable du PLANNING DES SPRINTS qui n'a PAS encore de fichier MDX, cree une nouvelle entree en suivant la convention : kebab-case-titre-prenomdev (ex: "finances-ai-onboarding-wizard-leonard").
           3. Si un commit ne correspond clairement a AUCUN livrable, IGNORE-LE — ne force pas d'association. Inclus-le uniquement dans le digest Slack sous une section "Autres changements".
           4. NE determine PAS le statut toi-meme. Chaque commit a deja un champ "status" derive de sa branche (staging = "staging", main/production = "deployed"). Utilise cette valeur telle quelle.
-          5. Pour le champ "owner", utilise TOUJOURS le prenom exact tel qu'il apparait dans le PLANNING DES SPRINTS (ex: "Quentin", "Leonard"), PAS le nom complet de l'auteur du commit git. Fais correspondre l'auteur du commit au dev le plus proche dans le planning.
+          5. Pour le champ "owner", utilise TOUJOURS le prenom exact tel qu'il apparait dans le PLANNING DES SPRINTS, PAS le nom complet de l'auteur du commit git. Fais correspondre l'auteur du commit au dev le plus proche dans le planning.
           6. Pour le champ "title" des NOUVEAUX fichiers, utilise EXACTEMENT le titre tel qu'il apparait dans le PLANNING DES SPRINTS. Ne traduis pas et n'invente pas de titre different.
           7. Ecris une entree de changelog EN FRANCAIS pour chaque livrable associe. N'inclus PAS le nom de l'auteur dans l'entree (le owner est deja dans le frontmatter et affiche par colonne). Format :
              ### $TODAY

@@ -47,6 +47,22 @@ Each project branch has a `sync-log.json` that records every Action run:
 
 `staging`, `deployed` — the automated Action sets `staging` or `deployed` (derived from branch)
 
+## Tagging a person in changelog entries
+
+To re-enable author tagging in MDX changelog entries, edit the AI prompt in the GitHub Action (`saship-digest.yml` and `setup/github-action.yml`). In the INSTRUCTIONS section, change the changelog format instruction to append `— *<Auteur>*` after the summary:
+
+```
+### $TODAY
+<resume concis en francais> — *<Auteur>*
+```
+
+And in the JSON response example, update the `entry` field:
+```
+"entry": "### $TODAY\n<resume en francais> — *Auteur*"
+```
+
+This produces entries like `— *Quentin H*` in MDX files. Currently disabled because the owner is already in the frontmatter and displayed per-column in the UI.
+
 ## GitHub Actions (installed on client dev repo, templates in `setup/`)
 
 - `saship-digest.yml` — daily cron (7:30 AM UTC+1 weekdays) + manual trigger. Collects all commits from the previous day across all branches for the commit log page, then filters by project prefix for AI matching. Updates MDX/extras/stats/sync-log on the tracking repo, posts daily Slack digest.
