@@ -1,6 +1,8 @@
 import { getConfig } from "@/lib/config";
 import { getLinearIssues, groupByStateType, type LinearIssue } from "@/lib/linear";
 
+export const dynamic = "force-dynamic";
+
 const PRIORITY_COLORS: Record<number, string> = {
   0: "bg-neutral-300",       // No priority
   1: "bg-status-error",      // Urgent
